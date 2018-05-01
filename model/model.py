@@ -55,7 +55,7 @@ class DecoderRNN(nn.Module):
         return output, hidden
 
 class VideoRNN(nn.Module):
-    def __init__(self, cnn_hidden, hidden_size, num_layer=1, output_size=512, dropout=0.5, cnn_type=models.resnet50, rnn_type="GRU", pretrained=True):
+    def __init__(self, cnn_hidden, hidden_size, num_layers=1, output_size=512, dropout=0.5, cnn_type=models.resnet50, rnn_type="GRU", pretrained=True):
         super(VideoRNN, self).__init__()
         self.cnn = cnn_type(pretrained=pretrained)
         if cnn_type == models.resnet50:

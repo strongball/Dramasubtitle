@@ -6,7 +6,7 @@ from ImgSub2Sub.train import trainer
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-e', '--epoch', help="Epoch to Train", type=int, default=10)
+parser.add_argument('-e', '--epoch', help="Epoch to Train", type=int, default=50)
 parser.add_argument('-b', '--batch', help="Batch size", type=int, default=64)
 parser.add_argument('-lr', help="learning rate to Train", type=float, default = 1e-4)
 parser.add_argument('-m', '--model', help="Model dir", required=True)

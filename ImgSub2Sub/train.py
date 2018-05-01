@@ -9,7 +9,7 @@ import torch.utils.data
 from utils.CvTransform import CvResize, CvCenterCrop
 from utils.tokenMaker import Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
-from model.BigModel import SubImgToSeq
+from model.BigModel import SubImgToSeq, SubVideoToSeq
 from dataset.readVideo import DramaDataset
 
 from tensorboardX import SummaryWriter
@@ -46,14 +46,14 @@ def trainer(args):
                             dataDir=DataDir)
     
     datasets = DramaDataset(basedir=DataDir,
-                            maxFrame=1,
+                            maxFrame=2,
                             timeOffset=0.1,
                             transform = transforms.Compose([CvResize(256),
                                                             CvCenterCrop(224),
                                                             transforms.ToTensor(),
                                                             transforms.Normalize([0.485, 0.456, 0.406], 
                                                                                  [0.229, 0.224, 0.225])]))
-    loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=8)
+    loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=4)
     print("Data size\t: {}".format(len(datasets)))
     print("Max epoch\t: {}\nBatch size\t: {}\nLearning rate\t: {}\n".format(MaxEpoch, BatchSize, lr))
     print("Start training........\n")
@@ -85,6 +85,7 @@ def trainer(args):
                 recLoss.addData(loss.data[0])
                 writer.add_scalar('loss', loss.data[0], trainStep)
                 trainStep += 1
+                loss = None
                 if i % 50 == 0:                        
                     print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                           .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
@@ -92,11 +93,12 @@ def trainer(args):
                     print("F: {}\nS: {}\nP: {}\n"
                           .format(pre[0], nex[0], pred))
             except Exception as exp:
+                print("Step error: {}".format(i))
                 print(exp)
         if i % 50 != 0:
             print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                   .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
-        modelName = os.path.join(modelDir, "SubImgModel.{}.pth".format(int((epoch+1)*10/MaxEpoch)))
+        modelName = os.path.join(modelDir, "SubImgModel.{}.pth".format(int((epoch+1)/5)))
         print("Saving Epoch model: {}.....\n".format(modelName))
         torch.save(model, modelName)
 
@@ -170,7 +172,7 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
     else:
         videoOpt = {
             "cnn_hidden": 1024,
-            "hidden_size": 1024,
+            "hidden_size": 512,
             "output_size": 1024,
             "pretrained": True
         }
@@ -186,7 +188,8 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "hidden_size": 512,
             "feature_size": 1024 
         }
-        model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
+        #model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
+        model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
         
     return lang, model
 

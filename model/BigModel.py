@@ -87,6 +87,48 @@ class SubImgToSeq(nn.Module):
         output = F.softmax(output, dim=2)
         return output, hidden
     
+class SubVideoToSeq(nn.Module):
+    def __init__(self, video_setting, subencoder_setting, decoder_setting, padding_idx=0):
+        super(SubVideoToSeq, self).__init__()
+        self.trainStep = 0
+        self.videoRnn = VideoRNN(**video_setting)
+        self.subRnn = EncoderRNN(**subencoder_setting)
+        
+        self.context = Context(video_feature = video_setting["output_size"], 
+                               sub_feature =subencoder_setting["output_size"],
+                               output_size = decoder_setting["feature_size"])
+        
+        self.decoderRnn = DecoderRNN(**decoder_setting)
+        
+    def forward(self, input_img, sub_seq, target_seq, hidden=None):
+        output = self.makeContext(input_img, sub_seq)
+        
+        if(isinstance(target_seq, tuple)):
+            target_seq, tarLengths = target_seq
+        output, hidden = self.decoderRnn(target_seq, output, hidden)
+        return output, hidden
+    
+    def makeContext(self, input_img, sub_seq):
+        vout, _ = self.videoRnn(input_img)
+        vout = vout[:,-1,:]
+        
+        if(isinstance(sub_seq, tuple)):
+            subtitle, subLengths = sub_seq
+        else:
+            subtitle = sub_seq
+            subLengths = [sub_seq.size(1)]*sub_seq.size(0)
+            
+        sout, _ = self.subRnn(subtitle)
+        sout = getLastOutputs(sout, subLengths)
+        
+        cxt = self.context(vout, sout)
+        return cxt
+    
+    def decode(self, input_seq, context, hidden=None):
+        output, hidden = self.decoderRnn(input_seq, context, hidden)
+        output = F.softmax(output, dim=2)
+        return output, hidden
+    
 class SubToSeq(nn.Module):
     def __init__(self, subencoder_setting, decoder_setting, padding_idx=0):
         super(SubToSeq, self).__init__()

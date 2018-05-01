@@ -20,11 +20,13 @@ class ReadSubtitle():
         
     def __getitem__(self, index):
         ann = self.data[self.pairs[index]]
-        time = ann["start"] + self.timeOffset * (ann["end"]-ann["start"])
         imgs = []
-        fsize = 0
-        retry = 0
+
         if self.maxFrame > 0:
+            time = ann["start"] + self.timeOffset * (ann["end"]-ann["start"])
+            inter = (ann["end"] - time) / self.maxFrame
+            fsize = 0
+            retry = 0
             cap = cv2.VideoCapture(self.videoFile)
             while self.maxFrame > fsize and time < ann["end"]:
                 cap.set(cv2.CAP_PROP_POS_MSEC, time*1000)
@@ -34,7 +36,7 @@ class ReadSubtitle():
                     if self.transform is not None:
                         img = self.transform(img)
                     imgs.append(img)
-                    time += self.inter
+                    time += inter
                     fsize += 1
                 else:
                     retry += 1
