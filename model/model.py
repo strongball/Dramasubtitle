@@ -28,7 +28,7 @@ class EncoderRNN(nn.Module):
         #output = F.relu(output)
         output, hidden = self.gru(output, hidden)
         output = self.out(output)
-        output = F.relu(output)
+        output = F.tanh(output)
         return output, hidden
 
 class DecoderRNN(nn.Module):

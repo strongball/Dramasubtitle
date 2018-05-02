@@ -3,13 +3,11 @@ import torch.nn as nn
 
 from torch import optim
 from torch.autograd import Variable
-import torchvision.transforms as transforms
 import torch.utils.data
 
-from utils.CvTransform import CvResize, CvCenterCrop
 from utils.tokenMaker import Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
-from model.BigModel import SubImgToSeq, SubVideoToSeq
+from Similarity.model import GesdSimilarity
 from dataset.readVideo import DramaDataset
 
 from tensorboardX import SummaryWriter
@@ -46,13 +44,8 @@ def trainer(args):
                             dataDir=DataDir)
     
     datasets = DramaDataset(basedir=DataDir,
-                            maxFrame=1,
-                            timeOffset=0.2,
-                            transform = transforms.Compose([CvResize(256),
-                                                            CvCenterCrop(224),
-                                                            transforms.ToTensor(),
-                                                            transforms.Normalize([0.485, 0.456, 0.406], 
-                                                                                 [0.229, 0.224, 0.225])]))
+                            maxFrame=0,
+                            timeOffset=0.2,)
     loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=4)
     print("Data size\t: {}".format(len(datasets)))
     print("Max epoch\t: {}\nBatch size\t: {}\nLearning rate\t: {}\n".format(MaxEpoch, BatchSize, lr))
@@ -64,8 +57,8 @@ def trainer(args):
         Variable = Variable.cuda
         model.cuda()
     model.train()
-    criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.BCELoss()
     
     recLoss = Average()
     timer = Timer()
@@ -74,13 +67,14 @@ def trainer(args):
         for i, data in enumerate(loader, 1):
             try:
                 pre, nex, imgs = data
+                pre, nex, scores = makeNegSample(pres, nexs, negSize=2)
                 loss = step(model=model,
-                              criterion=criterion,
-                              optimizer=optimizer,
-                              imgs=imgs[0],
-                             subtitles= pre,
-                              targets=nex,
-                             lang=lang)
+                            optimizer=optimizer,
+                            criterion=criterion,
+                            subtitles= pre,
+                            targets=nex,
+                            scores=scores,
+                            lang=lang)
 
                 recLoss.addData(loss.data[0])
                 writer.add_scalar('loss', loss.data[0], trainStep)
@@ -102,42 +96,41 @@ def trainer(args):
         print("Saving Epoch model: {}.....\n".format(modelName))
         torch.save(model, modelName)
 
-def step(model, criterion, optimizer, imgs, subtitles, targets, lang):
+def makeNegSample(pres, nexs, negSize):
+    mpres = []
+    mnexts = []
+    scores = []
+    for pre, nex in zip(pres, nexs):
+        while True:
+            negs = random.sample(nexs, negSize)
+            if not nex in negs:
+                break
+        mpres +=[pre] * (negSize + 1)
+        mnexts += [nex] + negs
+        scores += [1] + [0] * negSize
+    return mpres, mnexts, scores
+
+def step(model, optimizer, criterion, subtitles, targets, scores, lang):
     imgs, inSubtitles, inTargets, outTargets = transInputs(imgs, subtitles, targets, lang)
+    inSubtitles = sentenceToVector(subtitles, lang)
+    inTargets = sentenceToVector(targets, lang)
+    scores = Variable(torch.Tensor(scores))
     
-    outputs, hidden = model(imgs, inSubtitles, inTargets)
+    ouputs = model(inSubtitles, inTargets)
     
-    outputs = flatMutileLength(outputs, outTargets[1])
-    targets = flatMutileLength(outTargets[0], outTargets[1])
-    loss = criterion(outputs, targets)
-    
+    loss = criterion(ouputs, scores)
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
     return loss
 
-def transInputs(imgs, subtitles, targets, lang):
-    if imgs.dim() < 5:
-        imgs = imgs.unsqueeze(1)
-    imgs = Variable(imgs)
-        
-    inSubtitles = []
-    inTargets = []
-    outTargets = []
-    
+def sentenceToVector(sentences, lang, sos=False, eos=False):
+    vectors = []
     vectorTransforms = [torch.LongTensor, Variable]
-    
-    for subtitle in subtitles:
-        inSubtitles.append(lang.sentenceToVector(subtitle, sos=False, eos=False))
-    inSubtitles = padding(inSubtitles, lang["PAD"], vectorTransforms)
-    
-    for target in targets:
-        inTargets.append(lang.sentenceToVector(target, sos=True, eos=False))
-        outTargets.append(lang.sentenceToVector(target, sos=False, eos=True))
-    inTargets = padding(inTargets, lang["PAD"], vectorTransforms)
-    outTargets = padding(outTargets, lang["PAD"], vectorTransforms)
-
-    return imgs, inSubtitles, inTargets, outTargets
+    for s in sentences:
+        vectors.append(lang.sentenceToVector(s, sos=sos, eos=eos))
+    vectors = padding(vectors, lang["PAD"], vectorTransforms)
+    return vectors
 
 def createLang(name, dataDir):
     lang = Lang(name, splt)
@@ -170,26 +163,13 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
         model = torch.load(modelfile)
         print("Load model: {}.".format(modelfile))
     else:
-        videoOpt = {
-            "cnn_hidden": 1024,
-            "hidden_size": 512,
-            "output_size": 1024,
-            "pretrained": True
-        }
         subencoderOpt = {
             "word_size": len(lang),
             "em_size": 512,
             "hidden_size": 512,
             "output_size": 1024 
         }
-        decoderOpt = {
-            "word_size": len(lang),
-            "em_size": 512,
-            "hidden_size": 512,
-            "feature_size": 1024 
-        }
-        #model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
-        model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
+        model = GesdSimilarity(subencoderOpt)
         
     return lang, model
 
