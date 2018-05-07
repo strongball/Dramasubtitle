@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 
 from torch import optim
-from torch.autograd import Variable
 import torchvision.transforms as transforms
 import torch.utils.data
 
@@ -28,6 +27,8 @@ parser.add_argument('-m', '--model', help="model dir", required=True)
 parser.add_argument('-d', '--data', help="Data loaction", required=True)
 
 splt = " "
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def trainer(args):
     modelDir = args.model
     LangFile = os.path.join(modelDir, "Lang.pkl")
@@ -38,8 +39,7 @@ def trainer(args):
     DataDir = args.data
     lr = args.lr
     
-    use_cuda = torch.cuda.is_available()
-    print("=========Use GPU: {}=========\n".format(use_cuda))
+    print("=========Use Device: {}=========\n".format(device))
     lang, model = Loadmodel(modelDir,
                             LangFile,
                             modelFile,
@@ -59,10 +59,7 @@ def trainer(args):
     print("Start training........\n")
     writer = SummaryWriter(modelDir)
     
-    if use_cuda:
-        global Variable
-        Variable = Variable.cuda
-        model.cuda()
+    model.to(device)
     model.train()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -82,8 +79,8 @@ def trainer(args):
                               targets=nex,
                              lang=lang)
 
-                recLoss.addData(loss.data[0])
-                writer.add_scalar('loss', loss.data[0], trainStep)
+                recLoss.addData(loss.item())
+                writer.add_scalar('loss', loss.item(), trainStep)
                 trainStep += 1
                 loss = None
                 if i % 50 == 0:                        
@@ -119,13 +116,13 @@ def step(model, criterion, optimizer, imgs, subtitles, targets, lang):
 def transInputs(imgs, subtitles, targets, lang):
     if imgs.dim() < 5:
         imgs = imgs.unsqueeze(1)
-    imgs = Variable(imgs)
+    imgs = imgs.to(device)
         
     inSubtitles = []
     inTargets = []
     outTargets = []
     
-    vectorTransforms = [torch.LongTensor, Variable]
+    vectorTransforms = [lambda x: torch.LongTensor(x).to(device)]
     
     for subtitle in subtitles:
         inSubtitles.append(lang.sentenceToVector(subtitle, sos=False, eos=False))
@@ -174,41 +171,48 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "cnn_hidden": 1024,
             "hidden_size": 512,
             "output_size": 1024,
+            #"num_layers": 1,
+            #"dropout": 0,
             "pretrained": True
         }
         subencoderOpt = {
             "word_size": len(lang),
             "em_size": 512,
+            "num_layers": 1,
+            "dropout": 0,
             "hidden_size": 512,
             "output_size": 1024 
         }
         decoderOpt = {
             "word_size": len(lang),
             "em_size": 512,
+            "num_layers": 1,
+            "dropout": 0,
             "hidden_size": 512,
             "feature_size": 1024 
         }
-        #model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
-        model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
+        model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
+        #model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
         
     return lang, model
 
 def predit(model, lang, imgs, subtitle,max_length=50):
     ans = []
-    inputImgs = Variable(imgs.unsqueeze(0))
-    subtitle = Variable(torch.LongTensor(lang.sentenceToVector(subtitle, sos=False, eos=False)).unsqueeze(0))
-    inputs = Variable(torch.LongTensor([[lang["SOS"]]]).long())
+    inputImgs = imgs.unsqueeze(0).to(device)
+    subtitle = torch.LongTensor(lang.sentenceToVector(subtitle, sos=False, eos=False)).unsqueeze(0).to(device)
+    inputs = torch.LongTensor([[lang["SOS"]]]).to(device)
+    
     hidden = None
     
     cxt = model.makeContext(inputImgs, subtitle)
     for i in range(max_length):
         outputs, hidden = model.decode(inputs, cxt, hidden)
         prob, outputs = outputs.topk(1)
-        outputs = outputs[0][0].data[0]
-        if(outputs == lang["EOS"]):
+        if(outputs.item() == lang["EOS"]):
             break
-        ans.append(outputs)
-        inputs = Variable(torch.LongTensor([[outputs]]))
+        ans.append(outputs.item())
+        
+        inputs = outputs.squeeze(1).detach()
     return lang.vectorToSentence(ans)
 
 if __name__ == "__main__":

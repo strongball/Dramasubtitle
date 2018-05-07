@@ -26,6 +26,7 @@ parser.add_argument('-m', '--model', help="model dir", required=True)
 parser.add_argument('-d', '--data', help="Data loaction", required=True)
 
 splt = " "
+use_cuda = torch.cuda.is_available()
 def trainer(args):
     modelDir = args.model
     LangFile = os.path.join(modelDir, "Lang.pkl")
@@ -36,7 +37,6 @@ def trainer(args):
     DataDir = args.data
     lr = args.lr
     
-    use_cuda = torch.cuda.is_available()
     print("=========Use GPU: {}=========\n".format(use_cuda))
     lang, model = Loadmodel(modelDir,
                             LangFile,
@@ -53,8 +53,6 @@ def trainer(args):
     writer = SummaryWriter(modelDir)
     
     if use_cuda:
-        global Variable
-        Variable = Variable.cuda
         model.cuda()
     model.train()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -65,9 +63,9 @@ def trainer(args):
     trainStep = 0
     for epoch in range(MaxEpoch):
         for i, data in enumerate(loader, 1):
-            try:
+            #try:
                 pre, nex, imgs = data
-                pre, nex, scores = makeNegSample(pres, nexs, negSize=2)
+                pre, nex, scores = makeNegSample(pre, nex, negSize=2)
                 loss = step(model=model,
                             optimizer=optimizer,
                             criterion=criterion,
@@ -76,23 +74,20 @@ def trainer(args):
                             scores=scores,
                             lang=lang)
 
-                recLoss.addData(loss.data[0])
-                writer.add_scalar('loss', loss.data[0], trainStep)
+                recLoss.addData(loss.item())
+                writer.add_scalar('loss', loss.item(), trainStep)
                 trainStep += 1
                 loss = None
                 if i % 50 == 0:                        
                     print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                           .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
-                    pred = predit(model, lang, imgs[0][:1], pre[0])
-                    print("F: {}\nS: {}\nP: {}\n"
-                          .format(pre[0], nex[0], pred))
-            except Exception as exp:
-                print("Step error: {}".format(i))
-                print(exp)
+            #except Exception as exp:
+                #print("Step error: {}".format(i))
+                #print(exp)
         if i % 50 != 0:
             print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                   .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
-        modelName = os.path.join(modelDir, "SubImgModel.{}.pth".format(int((epoch+1)/5)))
+        modelName = os.path.join(modelDir, "SimilarityModel.{}.pth".format(int((epoch+1)/5)))
         print("Saving Epoch model: {}.....\n".format(modelName))
         torch.save(model, modelName)
 
@@ -111,10 +106,10 @@ def makeNegSample(pres, nexs, negSize):
     return mpres, mnexts, scores
 
 def step(model, optimizer, criterion, subtitles, targets, scores, lang):
-    imgs, inSubtitles, inTargets, outTargets = transInputs(imgs, subtitles, targets, lang)
     inSubtitles = sentenceToVector(subtitles, lang)
     inTargets = sentenceToVector(targets, lang)
-    scores = Variable(torch.Tensor(scores))
+    scores = torch.cuda.FloatTensor(scores) if use_cuda else torch.FloatTensor(scores)
+    scores = Variable(scores)
     
     ouputs = model(inSubtitles, inTargets)
     
@@ -126,7 +121,7 @@ def step(model, optimizer, criterion, subtitles, targets, scores, lang):
 
 def sentenceToVector(sentences, lang, sos=False, eos=False):
     vectors = []
-    vectorTransforms = [torch.LongTensor, Variable]
+    vectorTransforms = [torch.cuda.LongTensor, Variable] if use_cuda else [torch.LongTensor, Variable]
     for s in sentences:
         vectors.append(lang.sentenceToVector(s, sos=sos, eos=eos))
     vectors = padding(vectors, lang["PAD"], vectorTransforms)
@@ -167,29 +162,11 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "word_size": len(lang),
             "em_size": 512,
             "hidden_size": 512,
-            "output_size": 1024 
+            "output_size": 512 
         }
         model = GesdSimilarity(subencoderOpt)
         
     return lang, model
-
-def predit(model, lang, imgs, subtitle,max_length=50):
-    ans = []
-    inputImgs = Variable(imgs.unsqueeze(0))
-    subtitle = Variable(torch.LongTensor(lang.sentenceToVector(subtitle, sos=False, eos=False)).unsqueeze(0))
-    inputs = Variable(torch.LongTensor([[lang["SOS"]]]).long())
-    hidden = None
-    
-    cxt = model.makeContext(inputImgs, subtitle)
-    for i in range(max_length):
-        outputs, hidden = model.decode(inputs, cxt, hidden)
-        prob, outputs = outputs.topk(1)
-        outputs = outputs[0][0].data[0]
-        if(outputs == lang["EOS"]):
-            break
-        ans.append(outputs)
-        inputs = Variable(torch.LongTensor([[outputs]]))
-    return lang.vectorToSentence(ans)
 
 if __name__ == "__main__":
     args = parser.parse_args()

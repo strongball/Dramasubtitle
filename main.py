@@ -1,8 +1,7 @@
 #from translate.train import trainer
 #from SubToSub.train import trainer
-#from ImgSub2Sub.train import trainer
-#from NGram.train import trainer
-from Similarity.train import trainer
+from ImgSub2Sub.train import trainer
+#from Similarity.train import trainer
 
 import argparse
 

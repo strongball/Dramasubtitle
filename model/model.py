@@ -9,7 +9,7 @@ import torchvision.transforms as transforms
 
     
 class EncoderRNN(nn.Module):
-    def __init__(self, word_size, em_size, hidden_size, output_size, num_layers=1, dropout=0.5, rnn_type="GRU", padding_idx=0):
+    def __init__(self, word_size, em_size, hidden_size, output_size, num_layers=1, dropout=0.1, rnn_type="GRU", padding_idx=0):
         super(EncoderRNN, self).__init__()
         self.embedding = nn.Embedding(word_size, em_size, padding_idx=padding_idx)
         
@@ -32,7 +32,7 @@ class EncoderRNN(nn.Module):
         return output, hidden
 
 class DecoderRNN(nn.Module):
-    def __init__(self, word_size, em_size, hidden_size, feature_size, num_layers=1, dropout=0.5, padding_idx=0):
+    def __init__(self, word_size, em_size, hidden_size, feature_size, num_layers=1, dropout=0.1, padding_idx=0):
         super(DecoderRNN, self).__init__()
         self.embedding = nn.Embedding(word_size, em_size, padding_idx=0)
         self.gru = nn.GRU(em_size + feature_size, hidden_size, num_layers=num_layers, batch_first=True, dropout=dropout)
@@ -55,7 +55,7 @@ class DecoderRNN(nn.Module):
         return output, hidden
 
 class VideoRNN(nn.Module):
-    def __init__(self, cnn_hidden, hidden_size, num_layers=1, output_size=512, dropout=0.5, cnn_type=models.resnet50, rnn_type="GRU", pretrained=True):
+    def __init__(self, cnn_hidden, hidden_size, num_layers=1, output_size=512, dropout=0.1, cnn_type=models.resnet50, rnn_type="GRU", pretrained=True):
         super(VideoRNN, self).__init__()
         self.cnn = cnn_type(pretrained=pretrained)
         if cnn_type == models.resnet50:
