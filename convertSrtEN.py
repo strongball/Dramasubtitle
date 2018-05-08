@@ -5,8 +5,7 @@ import os
 import glob
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument("-s", "--srt", help="Srt Dir file location", required=True)
-parser.add_argument("-o", "--out", help="Output json location", required=True)
+parser.add_argument("-d", "--data", help="Srt Dir file location", required=True)
 
 punctuation = '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
 toSpace = re.compile('[{}\s]+'.format(re.escape(punctuation)))
@@ -68,17 +67,16 @@ def srt2json(srtfile, jsonfile):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    srtDir = args.srt
-    jsonDir = args.out
+    srtDir = os.path.join(args.data, "sub")
+    jsonDir = os.path.join(args.data, "json")
     
     if not os.path.isdir(jsonDir):
         os.makedirs(jsonDir)
-    
+    print(len(glob.glob(os.path.join(srtDir, '*.srt'))))
     for filename in glob.glob(os.path.join(srtDir, '*.srt')):
         outputname = os.path.splitext(os.path.basename(filename))[0] + ".json"
-        print("Make: ",filename)
         size = srt2json(filename, os.path.join(jsonDir, outputname))
-        if size:
-            print("Make file: {:15}, size: {:4}".format(outputname, size))
+        if size > 300:
+            print("Make file\t: {:15}, size: {:4}".format(outputname, size))
         else:
-            print("Error: {}".format(filename))
+            print("Error\t: {}".format(filename))
