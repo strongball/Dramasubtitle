@@ -172,23 +172,23 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "hidden_size": 512,
             "output_size": 1024,
             #"num_layers": 1,
-            #"dropout": 0,
+            "dropout": 0.1,
             "pretrained": True
         }
         subencoderOpt = {
             "word_size": len(lang),
-            "em_size": 512,
-            "num_layers": 1,
-            "dropout": 0,
-            "hidden_size": 512,
-            "output_size": 1024 
+            "em_size": 256,
+            "num_layers": 2,
+            "dropout": 0.1,
+            "hidden_size": 256,
+            "output_size": 512 
         }
         decoderOpt = {
             "word_size": len(lang),
-            "em_size": 512,
-            "num_layers": 1,
-            "dropout": 0,
-            "hidden_size": 512,
+            "em_size": 256,
+            "num_layers": 2,
+            "dropout": 0.1,
+            "hidden_size": 256,
             "feature_size": 1024 
         }
         model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
