@@ -45,7 +45,10 @@ class ReadSubtitle():
     def getBmp(self, start):
         dirName = os.path.join(self.videoFile, self.order)
         file = os.path.join(dirName, str(start))+".bmp"
-        return [Image.open(file)], True
+        img = Image.open(file)
+        if self.transform is not None:
+            img = self.transform(img)
+        return [img], True
         
     def getFrames(self, start, end):
         imgs = []

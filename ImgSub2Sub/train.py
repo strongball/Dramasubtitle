@@ -48,7 +48,9 @@ def trainer(args):
     datasets = DramaDataset(basedir=DataDir,
                             maxFrame=1,
                             timeOffset=0.2,
-                            transform = transforms.Compose([transforms.Resize(256),
+                            useBmp=True,
+                            transform = transforms.Compose([
+                                                            transforms.Resize(256),
                                                             transforms.CenterCrop(224),
                                                             transforms.ToTensor(),
                                                             transforms.Normalize([0.485, 0.456, 0.406], 
@@ -171,28 +173,28 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "cnn_hidden": 1024,
             "hidden_size": 512,
             "output_size": 1024,
-            #"num_layers": 1,
+            "num_layers": 1,
             "dropout": 0.1,
             "pretrained": True
         }
         subencoderOpt = {
             "word_size": len(lang),
-            "em_size": 256,
-            "num_layers": 2,
+            "em_size": 512,
+            "num_layers": 1,
             "dropout": 0.1,
-            "hidden_size": 256,
+            "hidden_size": 512,
             "output_size": 512 
         }
         decoderOpt = {
             "word_size": len(lang),
-            "em_size": 256,
-            "num_layers": 2,
+            "em_size": 512,
+            "num_layers": 1,
             "dropout": 0.1,
-            "hidden_size": 256,
+            "hidden_size": 512,
             "feature_size": 1024 
         }
-        model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
-        #model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
+        #model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
+        model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
         
     return lang, model
 
