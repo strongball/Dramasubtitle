@@ -174,14 +174,14 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "hidden_size": 512,
             "output_size": 1024,
             "num_layers": 1,
-            "dropout": 0.1,
+            "dropout": 0,
             "pretrained": True
         }
         subencoderOpt = {
             "word_size": len(lang),
             "em_size": 512,
             "num_layers": 1,
-            "dropout": 0.1,
+            "dropout": 0,
             "hidden_size": 512,
             "output_size": 512 
         }
@@ -189,7 +189,7 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "word_size": len(lang),
             "em_size": 512,
             "num_layers": 1,
-            "dropout": 0.1,
+            "dropout": 0,
             "hidden_size": 512,
             "feature_size": 1024 
         }
