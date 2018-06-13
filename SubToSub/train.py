@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch import optim
 import torch.utils.data
 
-from model.BigModel import SubToSeq
+from model.BigModel import SubToSeqFix as SubToSeq
 from utils.tokenMaker import Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
 from dataset.readVideo import DramaDataset
@@ -20,7 +20,7 @@ parser.add_argument('-lr', help="Loss to Train", type=float, default = 1e-4)
 parser.add_argument('-m', '--model', help="Model dir", required=True)
 parser.add_argument('-c', '--checkpoint', help="Old Model to load", default = "NoneExist")
 
-splt = " "
+splt = ""
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def trainer(args):
@@ -38,6 +38,7 @@ def trainer(args):
     #load data
     datasets = DramaDataset(basedir=DataDir,
                             maxFrame=0,
+                            maxSeries=5,
                             )
     loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=2)
     
@@ -93,7 +94,7 @@ def trainer(args):
             print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                   .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
 
-        modelName = os.path.join(modelDir, "SubSubModel.{}.pkl".format(int((epoch+1)*10/MaxEpoch)))
+        modelName = os.path.join(modelDir, "SubSubModel.{}.pth".format(int((epoch+1)/5)))
         print("Saving Epoch model: {}.....\n".format(modelName))
         torch.save(model, modelName)
     

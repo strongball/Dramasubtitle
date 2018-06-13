@@ -8,7 +8,8 @@ import torch.utils.data
 from utils.tokenMaker import Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
 from Similarity.model import GesdSimilarity
-from dataset.readVideo import DramaDataset
+#from dataset.readVideo import DramaDataset
+from dataset.translate import TranslateDataset as DramaDataset
 
 from tensorboardX import SummaryWriter
 
@@ -45,7 +46,11 @@ def trainer(args):
     
     datasets = DramaDataset(basedir=DataDir,
                             maxFrame=0,
-                            timeOffset=0.2,)
+                            timeOffset=0.2,
+                            startSeries=0,
+                            maxSeries=100000,
+                            subOffset=0, 
+                            subMax=200)
     loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=4)
     print("Data size\t: {}".format(len(datasets)))
     print("Max epoch\t: {}\nBatch size\t: {}\nLearning rate\t: {}\n".format(MaxEpoch, BatchSize, lr))

@@ -76,7 +76,7 @@ if __name__ == '__main__':
     for filename in glob.glob(os.path.join(srtDir, '*.srt')):
         outputname = os.path.splitext(os.path.basename(filename))[0] + ".json"
         size = srt2json(filename, os.path.join(jsonDir, outputname))
-        if size > 300:
+        if size > 100:
             print("Make file\t: {:15}, size: {:4}".format(outputname, size))
         else:
             print("Error\t: {}".format(filename))

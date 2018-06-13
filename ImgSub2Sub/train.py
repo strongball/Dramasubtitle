@@ -8,7 +8,7 @@ import torch.utils.data
 from utils.CvTransform import CvResize, CvCenterCrop
 from utils.tokenMaker import Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
-from model.BigModel import SubImgToSeq, SubVideoToSeq
+from model.BigModel import SubImgToSeq#, SubVideoToSeq
 from dataset.readVideo import DramaDataset
 
 from tensorboardX import SummaryWriter
@@ -26,7 +26,7 @@ parser.add_argument('-lr', help="Loss to Train", type=float, default = 1e-4)
 parser.add_argument('-m', '--model', help="model dir", required=True)
 parser.add_argument('-d', '--data', help="Data loaction", required=True)
 
-splt = " "
+splt = ""
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def trainer(args):
@@ -38,7 +38,7 @@ def trainer(args):
     BatchSize = args.batch
     DataDir = args.data
     lr = args.lr
-    
+    print("=========Start training ImgSubToSub=========\n")
     print("=========Use Device: {}=========\n".format(device))
     lang, model = Loadmodel(modelDir,
                             LangFile,
@@ -47,8 +47,10 @@ def trainer(args):
     
     datasets = DramaDataset(basedir=DataDir,
                             maxFrame=1,
+                            maxSeries=5,
                             timeOffset=0.2,
-                            useBmp=True,
+                            useBmp=False,
+                            randomStart=True,
                             transform = transforms.Compose([
                                                             transforms.Resize(256),
                                                             transforms.CenterCrop(224),
@@ -83,17 +85,19 @@ def trainer(args):
 
                 recLoss.addData(loss.item())
                 writer.add_scalar('loss', loss.item(), trainStep)
-                trainStep += 1
                 loss = None
                 if i % 50 == 0:                        
                     print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                           .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
+                    model.eval()
                     pred = predit(model, lang, imgs[0][:1], pre[0])
+                    model.train()
                     print("F: {}\nS: {}\nP: {}\n"
                           .format(pre[0], nex[0], pred))
             except Exception as exp:
                 print("Step error: {}".format(i))
                 print(exp)
+            trainStep += 1
         if i % 50 != 0:
             print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                   .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
@@ -173,15 +177,15 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "cnn_hidden": 1024,
             "hidden_size": 512,
             "output_size": 1024,
-            "num_layers": 1,
-            "dropout": 0,
+            #"num_layers": 1,
+            "dropout": 0.1,
             "pretrained": True
         }
         subencoderOpt = {
             "word_size": len(lang),
             "em_size": 512,
             "num_layers": 1,
-            "dropout": 0,
+            "dropout": 0.1,
             "hidden_size": 512,
             "output_size": 512 
         }
@@ -189,12 +193,12 @@ def Loadmodel(modelDir, LangBag, modelfile, dataDir):
             "word_size": len(lang),
             "em_size": 512,
             "num_layers": 1,
-            "dropout": 0,
+            "dropout": 0.1,
             "hidden_size": 512,
             "feature_size": 1024 
         }
-        #model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
-        model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
+        model = SubImgToSeq(videoOpt, subencoderOpt, decoderOpt)
+        #model = SubVideoToSeq(videoOpt, subencoderOpt, decoderOpt)
         
     return lang, model
 

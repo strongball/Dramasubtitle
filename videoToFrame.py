@@ -13,6 +13,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     datasets = DramaDataset(basedir=args.data,
+                            #startSeries=2,
+                            #maxSeries=1,
                             maxFrame=1,
                             timeOffset=0.2,
                             transform=transform,
@@ -24,10 +26,10 @@ if __name__ == "__main__":
             os.mkdir(epdir)
         print("Make: {}".format(ep.order))
         count = 0
-        for data in ep.data:
+        for i, data in ep.data.iterrows():
             filename = os.path.join(epdir, str(data["start"])+".bmp")
             imgs, sucess = ep.getFrames(data["start"], data["end"])
-            if sucess:
+            if sucess and len(imgs) > 0:
                 imgs[0].save(filename)
                 count += 1
             else:

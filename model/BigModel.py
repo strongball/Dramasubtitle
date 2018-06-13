@@ -161,3 +161,39 @@ class SubToSeq(nn.Module):
         output, hidden = self.decoderRnn(input_seq, context, hidden)
         output = F.softmax(output, dim=2)
         return output, hidden
+    
+class SubToSeqFix(nn.Module):
+    def __init__(self, subencoder_setting, decoder_setting, padding_idx=0):
+        super(SubToSeqFix, self).__init__()
+        self.trainStep = 0
+        self.subRnn = EncoderRNN(**subencoder_setting)
+        self.fc = nn.Linear(subencoder_setting["output_size"], decoder_setting["feature_size"])
+        self.decoderRnn = DecoderRNN(**decoder_setting)
+        
+    def forward(self, sub_seq, target_seq, hidden=None):
+        output = self.makeContext(sub_seq)
+        
+        if(isinstance(target_seq, tuple)):
+            target_seq, tarLengths = target_seq
+        output, hidden = self.decoderRnn(target_seq, output, hidden)
+        return output, hidden
+    
+    def makeContext(self, sub_seq):
+        if(isinstance(sub_seq, tuple)):
+            subtitle, subLengths = sub_seq
+        else:
+            subtitle = sub_seq
+            subLengths = [sub_seq.size(1)]*sub_seq.size(0)
+            
+        sout, _ = self.subRnn(subtitle)
+        output = getLastOutputs(sout, subLengths)
+        
+        output = self.fc(output)
+        output = F.relu(output)
+        
+        return output
+    
+    def decode(self, input_seq, context, hidden=None):
+        output, hidden = self.decoderRnn(input_seq, context, hidden)
+        output = F.softmax(output, dim=2)
+        return output, hidden

@@ -1,27 +1,38 @@
 import cv2
 from PIL import Image
-import json
+import pandas as pd
 import os
 import glob
+import random
 
 class ReadSubtitle():
-    def __init__(self, videoFile, subFile, order, transform=None, inter=1, maxFrame=128, timeOffset=0, useBmp=False):
-        with open(subFile, 'r') as f:
-            self.data = json.load(f)
-        self.pairs = []
-        for i in range(len(self.data)-1):
-            if self.data[i+1]["start"] - self.data[i]["end"] < 1:
-                self.pairs.append(i)
+    def __init__(self, videoFile, subFile, order, pairTime=1, randomStart=False, transform=None, inter=1, maxFrame=128, timeOffset=0, useBmp=False, subOffset=0, subMax=None):
+        self.data = self.makeDataFrame(subFile)
+        self.data = self.data[self.data["inter_time"] < pairTime]
+        self.data = self.data[subOffset : subMax]
         self.transform = transform
         self.videoFile = videoFile
         self.inter = inter
         self.timeOffset = timeOffset
+        self.randomStart = randomStart
         self.maxFrame = maxFrame
         self.order = order
         self.useBmp = useBmp
         
+        
+    def makeDataFrame(self, fileName):
+        df = pd.read_json(fileName)
+        df = df.sort_values("start")
+        df["start"] = df["start"].round(decimals=3)
+        df["end"] = df["end"].round(decimals=3)
+        df["inter_time"] = df["start"].shift(-1) - df["end"]
+        df["nsub"] = df["sub"].shift(-1)
+        
+        df = df[df["inter_time"] >= 0]
+        return df
+    
     def __getitem__(self, index):
-        ann = self.data[self.pairs[index]]
+        ann = self.data.iloc[index]
         imgs = []
 
         if self.maxFrame > 0:
@@ -31,30 +42,37 @@ class ReadSubtitle():
                 imgs, sucess = self.getFrames(ann["start"], ann["end"])
 
             if not sucess:
-                print("Get frame error!!\nTime: {}, At: {}".format(ann["start"], self.videoFile))
+                print("Get frame error!!\nTime: {}, Index: {}, At: {}".format(ann["start"], index, self.order))
                 if index > 0:
                     return self[index-1]
                 else:
                     return self[index+1]
 
-        return self.data[self.pairs[index]]["sub"], self.data[self.pairs[index]+1]["sub"], imgs
+        return ann["sub"], ann["nsub"], imgs
     
     def __len__(self):
-        return len(self.pairs)
+        return len(self.data)
     
     def getBmp(self, start):
         dirName = os.path.join(self.videoFile, self.order)
         file = os.path.join(dirName, str(start))+".bmp"
-        img = Image.open(file)
-        if self.transform is not None:
-            img = self.transform(img)
-        return [img], True
+        
+        if os.path.isfile(file):
+            img = Image.open(file)
+            if self.transform is not None:
+                img = self.transform(img)
+            return [img], True
+        else:
+            return [], False
         
     def getFrames(self, start, end):
         imgs = []
         fsize = 0
         retry = 0
+        
         time = start + self.timeOffset * (end-start)
+        if self.randomStart:
+            time = random.uniform(time, end)
         inter = (end - time) / self.maxFrame
         
         cap = cv2.VideoCapture(self.videoFile)
@@ -76,17 +94,18 @@ class ReadSubtitle():
         return imgs, True
                     
 class DramaDataset():
-    def __init__(self, basedir, inter=1, maxSeries=None, maxFrame = 128, transform=None, timeOffset=0, useBmp=False):
+    def __init__(self, basedir, pairTime=1, inter=1, randomStart=False, startSeries=1, maxSeries=None, maxFrame = 128, transform=None, timeOffset=0, useBmp=False, subOffset=0, subMax=None):
         self.dataFiles = []
         videoDir = os.path.join(basedir, "video")
         subDir = os.path.join(basedir, "json")
         self.frameDir = os.path.join(basedir, "frames")
         self.inter = inter
+        self.randomStart = randomStart
         self.timeOffset = timeOffset
         self.maxFrame = maxFrame
         
         self.epochs = []
-        sx = 1
+        sx = startSeries
         while True:
             notEpoch = 0
             serExist = False
@@ -101,10 +120,14 @@ class DramaDataset():
                                                     subFiles[0],
                                                     order = ep,
                                                     inter = self.inter,
+                                                    pairTime=pairTime,
+                                                    randomStart = self.randomStart,
                                                     maxFrame = self.maxFrame, 
                                                     timeOffset = self.timeOffset,
                                                     useBmp=useBmp,
-                                                    transform=transform))
+                                                    transform=transform,
+                                                    subOffset=subOffset, 
+                                                    subMax=subMax))
                     notEpoch = 0
                     serExist = True
                 else:
