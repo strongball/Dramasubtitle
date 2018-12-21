@@ -48,10 +48,10 @@ def trainer(args):
                             maxFrame=0,
                             timeOffset=0.2,
                             startSeries=0,
-                            maxSeries=100000,
+                            maxSeries=40000,
                             subOffset=0, 
-                            subMax=200)
-    loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=4)
+                            subMax=None)
+    loader = torch.utils.data.DataLoader(datasets, batch_size=BatchSize, shuffle=True, num_workers=1)
     print("Data size\t: {}".format(len(datasets)))
     print("Max epoch\t: {}\nBatch size\t: {}\nLearning rate\t: {}\n".format(MaxEpoch, BatchSize, lr))
     print("Start training........\n")
@@ -70,7 +70,7 @@ def trainer(args):
         for i, data in enumerate(loader, 1):
             #try:
                 pre, nex, imgs = data
-                pre, nex, scores = makeNegSample(pre, nex, negSize=2)
+                pre, nex, scores = makeNegSample(pre, nex, negSize=1)
                 loss = step(model=model,
                             optimizer=optimizer,
                             criterion=criterion,
@@ -86,13 +86,13 @@ def trainer(args):
                 if i % 50 == 0:                        
                     print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                           .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
-            #except Exception as exp:
+           # except Exception as exp:
                 #print("Step error: {}".format(i))
                 #print(exp)
         if i % 50 != 0:
             print("Epoch: {:2d}, Step: {:5d}, Time: {:6.3f}, Loss: {:7.5f}"
                   .format(epoch, i, timer.getAndReset(), recLoss.getAndReset()))
-        modelName = os.path.join(modelDir, "SimilarityModel.{}.pth".format(int((epoch+1)/5)))
+        modelName = os.path.join(modelDir, "SimilarityModel.{}.pth".format(int((epoch+1)/10)))
         print("Saving Epoch model: {}.....\n".format(modelName))
         torch.save(model, modelName)
 
@@ -117,8 +117,11 @@ def step(model, optimizer, criterion, subtitles, targets, scores, lang):
     scores = Variable(scores)
     
     ouputs = model(inSubtitles, inTargets)
-    
-    loss = criterion(ouputs, scores)
+    try:
+        loss = criterion(ouputs, scores)
+    except:
+        print(ouputs)
+        exit()
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()

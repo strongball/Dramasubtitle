@@ -6,7 +6,7 @@ import torchvision.transforms as transforms
 import torch.utils.data
 
 from utils.CvTransform import CvResize, CvCenterCrop
-from utils.tokenMaker import Lang
+from utils.tokenMaker import LangV2 as Lang
 from utils.tool import padding, flatMutileLength, Timer, Average
 from model.BigModel import SubImgToSeq#, SubVideoToSeq
 from dataset.readVideo import DramaDataset
@@ -26,7 +26,7 @@ parser.add_argument('-lr', help="Loss to Train", type=float, default = 1e-4)
 parser.add_argument('-m', '--model', help="model dir", required=True)
 parser.add_argument('-d', '--data', help="Data loaction", required=True)
 
-splt = ""
+splt = "jieba"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def trainer(args):
@@ -49,8 +49,8 @@ def trainer(args):
                             maxFrame=1,
                             maxSeries=5,
                             timeOffset=0.2,
-                            useBmp=False,
-                            randomStart=True,
+                            useBmp=True,
+                            randomStart=False,
                             transform = transforms.Compose([
                                                             transforms.Resize(256),
                                                             transforms.CenterCrop(224),
